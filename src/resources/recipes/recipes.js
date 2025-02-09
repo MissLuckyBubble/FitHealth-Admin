@@ -174,7 +174,7 @@ export const RecipeEdit = (props) => {
     enums.units.length === 0 ||
     ingredients.length === 0
   ) {
-    return <div>Loading...</div>;
+    return <div>Loading....</div>;
   }
 
   const units = enums.units || [];
