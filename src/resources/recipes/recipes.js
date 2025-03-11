@@ -102,8 +102,9 @@ export const RecipeCreate = (props) => {
   const transform = (data) => {
     const transformedIngredients =
       data.ingredients.map((ingredient) => {
+        console.log(ingredient);
         const foodItem = ingredients.find(
-          (item) => item.id === ingredient.foodItem.id
+          (item) => item.id === ingredient.foodItem
         );
         return {
           ...ingredient,
