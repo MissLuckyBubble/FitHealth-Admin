@@ -22,6 +22,7 @@ import {
   MealPlanEdit,
   MealPlanList,
 } from "./resources/mealplans/mealPlans";
+import { MealCreate, MealList, MealEdit } from "./resources/meals/meals";
 
 ReactDOM.render(
   <ThemeProvider theme={theme}>
@@ -47,6 +48,13 @@ ReactDOM.render(
         list={FoodItemList}
         edit={FoodItemEdit}
         create={FoodItemCreate}
+      />
+
+      <Resource
+        name="meals"
+        list={MealList}
+        create={MealCreate}
+        edit={MealEdit}
       />
 
       <Resource

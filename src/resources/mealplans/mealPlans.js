@@ -1,41 +1,30 @@
-import { Typography } from "@mui/material";
 import * as React from "react";
 import {
   List,
   Datagrid,
   TextField,
-  NumberField,
-  ArrayField,
-  SingleFieldList,
-  ChipField,
   EditButton,
   DeleteButton,
+  Create,
   Edit,
   SimpleForm,
   TextInput,
-  NumberInput,
-  Create,
+  ReferenceInput,
+  SelectInput,
   required,
-  SelectArrayInput,
-  ReferenceArrayInput,
-  useNotify,
-  useRedirect,
-  useRefresh,
+  BooleanField,
 } from "react-admin";
+import NutritionInfoBlock from "../components/NutritionInfoBlock";
 
 export const MealPlanList = (props) => (
   <List {...props}>
     <Datagrid rowClick="edit">
-      <TextField source="id" />
       <TextField source="name" />
-      <NumberField source="totalCalories" />
-      <TextField source="user.username" label="User" />
-
-      <ArrayField source="recipes">
-        <SingleFieldList>
-          <ChipField source="name" />
-        </SingleFieldList>
-      </ArrayField>
+      <TextField source="breakfast.name" label="Breakfast" />
+      <TextField source="lunch.name" label="Lunch" />
+      <TextField source="dinner.name" label="Dinner" />
+      <TextField source="snack.name" label="Snack" />
+      <BooleanField source="verifiedByAdmin" />
 
       <EditButton />
       <DeleteButton />
@@ -43,93 +32,41 @@ export const MealPlanList = (props) => (
   </List>
 );
 
-export const MealPlanCreate = (props) => {
-  const notify = useNotify();
-  const redirect = useRedirect();
-  const refresh = useRefresh();
-  const transform = (data) => {
-    return {
-      name: data.name,
-      recipeIds: data.recipeIds || [],
-    };
-  };
+const MealReferenceInput = ({ source, label }) => (
+  <ReferenceInput source={`${source}.id`} reference="meals" label={label}>
+    <SelectInput optionText="name" />
+  </ReferenceInput>
+);
 
-  return (
-    <Create {...props} transform={transform}>
-      <SimpleForm
-        onSuccess={() => {
-          notify("Meal Plan created successfully", { type: "info" });
-          redirect("list", props.basePath);
-          refresh();
-        }}
-        onFailure={(error) =>
-          notify(`Error: ${error.message}`, { type: "warning" })
-        }
-      >
-        <TextInput source="name" validate={required()} />
+const transform = (data) => ({
+  name: data.name,
+  breakfast: data.breakfast?.id ? { id: data.breakfast.id } : null,
+  lunch: data.lunch?.id ? { id: data.lunch.id } : null,
+  dinner: data.dinner?.id ? { id: data.dinner.id } : null,
+  snack: data.snack?.id ? { id: data.snack.id } : null,
+});
 
-        <ReferenceArrayInput
-          source="recipeIds"
-          reference="recipes"
-          label="Recipes"
-          validate={required()}
-        >
-          <SelectArrayInput optionText="name" />
-        </ReferenceArrayInput>
-      </SimpleForm>
-    </Create>
-  );
-};
+export const MealPlanCreate = (props) => (
+  <Create {...props} transform={transform}>
+    <SimpleForm>
+      <TextInput source="name" validate={required()} />
+      <MealReferenceInput source="breakfast" label="Breakfast" />
+      <MealReferenceInput source="lunch" label="Lunch" />
+      <MealReferenceInput source="dinner" label="Dinner" />
+      <MealReferenceInput source="snack" label="Snack" />
+    </SimpleForm>
+  </Create>
+);
 
-export const MealPlanEdit = (props) => {
-  const notify = useNotify();
-  const redirect = useRedirect();
-  const refresh = useRefresh();
-
-  const transform = (data) => {
-    return {
-      ...data,
-    };
-  };
-
-  return (
-    <Edit {...props} transform={transform}>
-      <SimpleForm
-        onSuccess={() => {
-          notify("Meal Plan updated successfully", { type: "info" });
-          redirect("list", props.basePath);
-          refresh();
-        }}
-        onFailure={(error) =>
-          notify(`Error: ${error.message}`, { type: "warning" })
-        }
-      >
-        <TextInput source="name" validate={required()} />
-
-        {}
-        <ReferenceArrayInput
-          source="recipeIds"
-          reference="recipes"
-          label="Recipes"
-          format={(value, record) => {
-            if (record.recipes) {
-              return record.recipes.map((r) => r.id);
-            }
-            return value || [];
-          }}
-          parse={(ids) => ids}
-        >
-          <SelectArrayInput optionText="name" />
-        </ReferenceArrayInput>
-        <Typography variant="h6">
-          Total Calories:{" "}
-          <NumberField source="totalCalories" label="Current Total Calories" />
-        </Typography>
-
-        <Typography variant="h6">
-          Owner: <TextField source="user.username" label="User" />
-        </Typography>
-      </SimpleForm>
-    </Edit>
-  );
-};
+export const MealPlanEdit = (props) => (
+  <Edit {...props} transform={transform}>
+    <SimpleForm>
+      <TextInput source="name" validate={required()} />
+      <MealReferenceInput source="breakfast" label="Breakfast" />
+      <MealReferenceInput source="lunch" label="Lunch" />
+      <MealReferenceInput source="dinner" label="Dinner" />
+      <MealReferenceInput source="snack" label="Snack" />
+      <NutritionInfoBlock />
+    </SimpleForm>
+  </Edit>
+);

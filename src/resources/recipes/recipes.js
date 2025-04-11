@@ -1,5 +1,4 @@
-// src/resources/recipes/recipes.js
-
+// src/resources/Recipe.tsx
 import * as React from "react";
 import {
   List,
@@ -14,14 +13,14 @@ import {
   ArrayInput,
   SimpleFormIterator,
   SelectInput,
-  ReferenceInput,
-  AutocompleteInput,
   Create,
   required,
   CheckboxGroupInput,
   BooleanField,
 } from "react-admin";
 import { useEffect, useState } from "react";
+import ChipArrayField from "../components/ChipArrayField";
+import NutritionInfoBlock from "../components/NutritionInfoBlock";
 import { Typography } from "@mui/material";
 
 const fetchData = async (url) => {
@@ -32,43 +31,31 @@ const fetchData = async (url) => {
       Authorization: `Bearer ${token}`,
     },
   });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch data from ${url}: ${response.status}`);
-  }
-
+  if (!response.ok) throw new Error(`Failed to fetch from ${url}`);
   return response.json();
 };
 
-const useRecipes = () => {
-  const [enums, setEnums] = useState({
-    recipeTypes: [],
-    units: [],
-  });
+const useRecipeFormData = () => {
+  const [enums, setEnums] = useState({ recipeTypes: [], units: [] });
   const [ingredients, setIngredients] = useState([]);
 
   useEffect(() => {
-    const fetchAllData = async () => {
+    const load = async () => {
       try {
-        const fetchedEnums = await fetchData("http://localhost:8080/enums");
-
-        setEnums(fetchedEnums);
-
-        const fetchedIngredients = await fetchData(
-          "http://localhost:8080/food-items"
-        );
-        setIngredients(fetchedIngredients);
-      } catch (error) {
-        console.error("Error fetching recipe data:", error.message);
+        const [enumData, foodData] = await Promise.all([
+          fetchData("http://localhost:8080/enums"),
+          fetchData("http://localhost:8080/food-items"),
+        ]);
+        setEnums(enumData);
+        setIngredients(foodData);
+      } catch (err) {
+        console.error("Error loading recipe form data", err.message);
       }
     };
-
-    fetchAllData();
+    load();
   }, []);
-  return {
-    enums,
-    ingredients,
-  };
+
+  return { enums, ingredients };
 };
 
 export const RecipeList = (props) => (
@@ -76,10 +63,10 @@ export const RecipeList = (props) => (
     <Datagrid>
       <TextField source="id" />
       <TextField source="name" />
-      <TextField source="calories" />
+      <TextField source="macronutrients.calories" />
       <BooleanField source="verifiedByAdmin" />
-      <TextField source="recipeTypes" />
-      <TextField source="allergens" />
+      <ChipArrayField source="recipeTypes" />
+      <ChipArrayField source="allergens" />
       <EditButton />
       <DeleteButton />
     </Datagrid>
@@ -87,77 +74,54 @@ export const RecipeList = (props) => (
 );
 
 export const RecipeCreate = (props) => {
-  const { enums, ingredients } = useRecipes();
+  const { enums, ingredients } = useRecipeFormData();
+  const units = enums.units || [];
 
-  if (
-    enums.recipeTypes.length === 0 ||
-    enums.units.length === 0 ||
-    ingredients.length === 0
-  ) {
+  if (!ingredients.length || !units.length || !enums.recipeTypes.length) {
     return <div>Loading...</div>;
   }
 
-  const units = enums.units || [];
-
-  const transform = (data) => {
-    const transformedIngredients =
-      data.ingredients.map((ingredient) => {
-        console.log(ingredient);
-        const foodItem = ingredients.find(
-          (item) => item.id === ingredient.foodItem
-        );
-        return {
-          ...ingredient,
-          foodItem,
-        };
-      }) || [];
-    return {
-      ...data,
-      ingredients: transformedIngredients,
-    };
-  };
+  const transform = (data) => ({
+    ...data,
+    recipeTypes: data.recipeTypes || [],
+    ingredients: data.ingredients.map((i) => ({
+      foodItem: ingredients.find((f) => f.id === i.foodItem)?.id || i.foodItem,
+      quantity: i.quantity,
+      unit: i.unit,
+      type: "RECIPE",
+    })),
+  });
 
   return (
     <Create {...props} transform={transform}>
       <SimpleForm>
         <TextInput source="name" validate={required()} />
         <TextInput source="description" />
-        <NumberInput source="preparationTime" />
-        <NumberInput source="cookingTime" />
-        <NumberInput source="servingSize" />
+        <NumberInput source="preparationTime" label="Prep Time (min)" />
+        <NumberInput source="cookingTime" label="Cook Time (min)" />
+        <NumberInput source="servingSize" label="Servings" />
 
         <CheckboxGroupInput
           source="recipeTypes"
-          choices={enums.recipeTypes.map((rt) => ({
-            id: rt,
-            name: rt,
-          }))}
+          label="Recipe Types"
+          choices={enums.recipeTypes.map((rt) => ({ id: rt, name: rt }))}
         />
 
         <ArrayInput source="ingredients">
           <SimpleFormIterator>
-            <ReferenceInput source="foodItem" reference="food-items">
-              <AutocompleteInput
-                source="foodItem"
-                choices={ingredients.map((item) => ({
-                  id: item.id,
-                  name: item.name,
-                }))}
-                label="Food Item"
-              />
-            </ReferenceInput>
-            <NumberInput
-              source="quantity"
-              label="Quantity"
+            <SelectInput
+              source="foodItem"
+              label="Food Item"
+              choices={ingredients.map((i) => ({
+                id: i.id,
+                name: i.name,
+              }))}
               validate={required()}
             />
+            <NumberInput source="quantity" validate={required()} />
             <SelectInput
               source="unit"
-              choices={units.map((unit) => ({
-                id: unit,
-                name: unit,
-              }))}
-              label="Unit"
+              choices={units.map((u) => ({ id: u, name: u }))}
               validate={required()}
             />
           </SimpleFormIterator>
@@ -168,38 +132,23 @@ export const RecipeCreate = (props) => {
 };
 
 export const RecipeEdit = (props) => {
-  const { enums, ingredients } = useRecipes();
-
-  if (
-    enums.recipeTypes.length === 0 ||
-    enums.units.length === 0 ||
-    ingredients.length === 0
-  ) {
-    return <div>Loading....</div>;
-  }
-
+  const { enums, ingredients } = useRecipeFormData();
   const units = enums.units || [];
 
-  const transform = (data) => {
-    const transformedIngredients =
-      data.ingredients?.map((ingredient) => {
-        console.log(ingredient);
-        const foodItem = ingredients.find(
-          (item) => item.id === ingredient.foodItem.id
-        );
-        return {
-          ...ingredient,
-          foodItem: foodItem,
-        };
-      }) || [];
+  if (!ingredients.length || !units.length || !enums.recipeTypes.length) {
+    return <div>Loading...</div>;
+  }
 
-    console.log("Transformed transformedRecipeTypes:", transformedIngredients);
-
-    return {
-      ...data,
-      ingredients: transformedIngredients,
-    };
-  };
+  const transform = (data) => ({
+    ...data,
+    recipeTypes: data.recipeTypes || [],
+    ingredients: data.ingredients.map((i) => ({
+      foodItem: i.foodItem?.id ?? i.foodItem,
+      quantity: i.quantity,
+      unit: i.unit,
+      type: "RECIPE",
+    })),
+  });
 
   return (
     <Edit {...props} transform={transform}>
@@ -212,48 +161,45 @@ export const RecipeEdit = (props) => {
 
         <CheckboxGroupInput
           source="recipeTypes"
-          choices={enums.recipeTypes.map((rt) => ({
-            id: rt,
-            name: rt,
-          }))}
+          label="Recipe Types"
+          choices={enums.recipeTypes.map((rt) => ({ id: rt, name: rt }))}
         />
 
-        <ArrayInput source="ingredients">
-          <SimpleFormIterator>
-            <ReferenceInput source="foodItem" reference="food-items">
-              <AutocompleteInput
-                source="foodItem.id"
-                choices={ingredients.map((item) => ({
-                  id: item.id,
-                  name: item.name,
-                }))}
+        {ingredients.length && units.length ? (
+          <ArrayInput source="ingredients">
+            <SimpleFormIterator>
+              <SelectInput
+                source="foodItem"
                 label="Food Item"
+                choices={ingredients.map((i) => ({
+                  id: i.id,
+                  name: i.name,
+                }))}
+                optionValue="id"
+                optionText="name"
+                parse={(value) => value}
+                format={(value) =>
+                  value && typeof value === "object" ? value.id : value
+                }
+                validate={required()}
               />
-            </ReferenceInput>
-            <NumberInput
-              source="quantity"
-              label="Quantity"
-              validate={required()}
-            />
-            <SelectInput
-              source="unit"
-              choices={units.map((unit) => ({
-                id: unit,
-                name: unit,
-              }))}
-              label="Unit"
-              validate={required()}
-            />
-          </SimpleFormIterator>
-        </ArrayInput>
-        <Typography variant="h6">Dietary Preferences:</Typography>
-        <TextField source="dietaryPreferences" />
-        <Typography variant="h6">Health Condition Suitability:</Typography>
-        <TextField source="healthConditionSuitability" />
-        <Typography variant="h6">
-          Owner username:{" "}
-          <TextField source="owner.username" label="Owner username" />
-        </Typography>
+
+              <NumberInput source="quantity" validate={required()} />
+              <SelectInput
+                source="unit"
+                label="Unit"
+                choices={units.map((u) => ({ id: u, name: u }))}
+                validate={required()}
+              />
+            </SimpleFormIterator>
+          </ArrayInput>
+        ) : (
+          <Typography variant="body2">
+            Loading ingredients and units...
+          </Typography>
+        )}
+
+        <NutritionInfoBlock />
       </SimpleForm>
     </Edit>
   );
